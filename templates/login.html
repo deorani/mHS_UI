@@ -7,11 +7,15 @@
   <body>
     <div class="container">
       <form action="" method="post">
+        <label for="username">Username</label>
         <input type="text" placeholder="Username" name="username" value="{{
           request.form.username }}">
+          <label for="password">Password</label>
          <input type="password" placeholder="Password" name="password" value="{{
           request.form.password }}">
-        <input class="btn btn-default" type="submit" value="Login">
+        <label for="submit"></label>
+        <input class="btn btn-default" type="submit" name="submit" value="Login">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% if error %}
         <p class="error"><strong>Error:</strong> {{ error }}
