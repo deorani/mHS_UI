@@ -1,24 +1,21 @@
-from flask import Flask, render_template, flash, request
+from flask import Flask, render_template, flash, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import (LoginManager, login_user, current_user,
+from flask_login import (LoginManager, UserMixin, login_user, current_user,
                             login_required, logout_user)
-from flask_wtf import FlaskForm, CsrfProtect
+from flask_wtf import FlaskForm, CSRFProtect
 from wtforms import StringField, PasswordField, BooleanField, SubmitField
 from wtforms.validators import ValidationError, DataRequired, Email, EqualTo
 from werkzeug.security import generate_password_hash, check_password_hash
-   
+from config import Config
+
 
 app = Flask(__name__)
-app.config.update(dict(
-    SECRET_KEY="alanafalanadhimkana",
-    WTF_CSRF_SECRET_KEY="blahblah",
-    CSRF_SESSION_KEY="12345"
-))
+app.config.from_object(Config)
 
 
 login_manager = LoginManager()
 db = SQLAlchemy()
-csrf = CsrfProtect()
+csrf = CSRFProtect()
 
 
 class LoginForm(FlaskForm):
@@ -26,7 +23,7 @@ class LoginForm(FlaskForm):
     password = PasswordField('password')
     submit = SubmitField('submit')
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     """An admin user capable of viewing reports.
 
     :param str email: email address of user
@@ -34,10 +31,15 @@ class User(db.Model):
 
     """
     __tablename__ = 'user'
-
-    username = db.Column(db.String, primary_key=True)
-    password = db.Column(db.String)
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), index=True, unique=True)
+    email = db.Column(db.String(120), index=True, unique=True)
+    password_hash = db.Column(db.String(128))
     authenticated = db.Column(db.Boolean, default=False)
+    admin = db.Column(db.Boolean, default=False)
+
+    def __repr__(self):
+        return '<User {}>'.format(self.username)
 
 
     def is_active(self):
@@ -45,16 +47,12 @@ class User(db.Model):
         return True
 
     def get_id(self):
-        """Return the email address to satisfy Flask-Login's requirements."""
-        return self.email
+        """Return the id to satisfy Flask-Login's requirements."""
+        return self.id
 
     def is_authenticated(self):
         """Return True if the user is authenticated."""
         return self.authenticated
-
-    def is_anonymous(self):
-        """False, as anonymous users aren't supported."""
-        return False
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -96,11 +94,13 @@ def user_loader(user_id):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('index'))
+    if not current_user.admin:
+         return redirect(url_for('index'))
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(username=form.username.data, email=form.email.data)
+        user = User(username=form.username.data,
+                    email=form.email.data,
+                    admin=False)
         user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
@@ -111,20 +111,15 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    print('abc')
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     form = LoginForm(request.form)
-    print(form.validate_on_submit())
-    print(form.errors)
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
-        print(user)
-        print(user.check_password(form.password.data))
         if user is None or not user.check_password(form.password.data):
             flash('Invalid username or password')
             return redirect(url_for('login'))
-        login_user(user, remember=form.remember_me.data)
+        login_user(user, remember=True)
         return redirect(url_for('index'))
     return render_template('login.html', title='Sign In', form=form)
 
@@ -138,20 +133,19 @@ def logout():
     db.session.add(user)
     db.session.commit()
     logout_user()
-    return render_template("logout.html")
+    return redirect(url_for('index'))
 
 
-
-@app.route("/")
+@app.route('/')
+@app.route('/index')
 @login_required
-def hello():
-    return "Hello World!"
+def index():
+    return render_template("index.html", title='Home Page')
 
 if __name__ == "__main__":
 
-    user = User()
-
     login_manager.init_app(app)
+    login_manager.login_view = 'login'
     db.init_app(app)
     csrf.init_app(app)
     app.run()

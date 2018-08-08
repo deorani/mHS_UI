@@ -1,6 +1,6 @@
 <html>
   <head>
-    <title>Flask Intro - login page</title>
+    <title>Login page</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="static/bootstrap.min.css" rel="stylesheet" media="screen">
   </head>
@@ -15,11 +15,14 @@
           request.form.password }}">
         <label for="submit"></label>
         <input class="btn btn-default" type="submit" name="submit" value="Login">
+        <!-- <label for="remember_me">Remember me</label>
+        <input type="checkbox" name="remember_me"  value="{{ request.form.remember_me }}"/> -->
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       </form>
       {% if error %}
         <p class="error"><strong>Error:</strong> {{ error }}
       {% endif %}
     </div>
+     <p>New User? <a href="{{ url_for('register') }}">Click to Register!</a></p>
   </body>
 </html>
